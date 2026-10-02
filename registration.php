@@ -12,7 +12,7 @@ if (isset($_POST["submit"])) {
     $name = trim($_POST["name"] ?? '');
     $email = trim($_POST["email"] ?? '');
     $password = $_POST["password"] ?? '';
-    $repeatPassword =$_POST["repeat_password"] ?? '';
+    $repeatPassword = $_POST["repeat_password"] ?? '';
 
     //проверяем что поля все заполнены
     if (empty($name) || empty($email) || empty($password) || empty($repeatPassword)) {
