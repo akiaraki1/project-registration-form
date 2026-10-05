@@ -1,6 +1,6 @@
 <?php
 //подключаем базу данных
-require_once("connect.php");
+require_once("connect.php"); //$mysqli
 
 //массив в котором будут добавляться ошибки
 $errors = [];
@@ -16,29 +16,27 @@ if (isset($_POST["submit"])) {
 
     //проверяем что поля все заполнены
     if (empty($name) || empty($email) || empty($password) || empty($repeatPassword)) {
-        array_push($errors, "Вы не заполнили все поля");
+    $errors[] = "Вы не заполнили все поля";
+    } else {
+        //проверяем валидность адреса почты
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Адрес почты не верный";
+        }
+        //проверяем длину пароля
+        if (mb_strlen($password, 'UTF-8') < 8) {
+        $errors[] = "Пароль должен быть не менее 8 символов";
+        }
+        //проверяем совпадение паролей
+        if ($password !== $repeatPassword) {
+        $errors[] = "Пароли не совпадают";
+        }
     }
 
-    //проверяем валидность адреса почты
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        array_push($errors, "Адрес почты не верный");
-    }
-
-    //проверяем длину пароля
-    if (mb_strlen($password, 'UTF-8') < 8) {
-    array_push($errors, "Пароль должен быть не менее 8 символов");
-    }
-
-    //проверяем совпадение паролей
-    if ($password !== $repeatPassword) {
-            array_push($errors, "Пароли не совпадают");
-    }
-
-    // Проверка существования email
+    // Проверка существования email + безопастность
     if (empty($errors)) {
         $checkEmail = "SELECT id FROM users WHERE `адрес почты` = ? LIMIT 1";
 
-        $stmt = $conn->prepare($checkEmail);   // 1. готовим запрос
+        $stmt = $mysqli->prepare($checkEmail);   // 1. готовим запрос
         $stmt->bind_param("s", $email);        // 2. подставляем значение вместо ?
         $stmt->execute();                      // 3. выполняем
         $stmt->store_result();                 // 4. сохраняем результат, чтобы работал num_rows
@@ -53,26 +51,24 @@ if (isset($_POST["submit"])) {
 
     // Если ошибок нет — регистрируем
     if (empty($errors)) {
+
+        //хешируем пароль для безопастности
         $hash = password_hash($password, PASSWORD_DEFAULT);
 
         $sql = "INSERT INTO users (`имя`, `адрес почты`, `пароль`) VALUES (?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sss", $name, $email, $hash);
+        $stmt = $mysqli->prepare($sql); // 1. готовим запрос
+        $stmt->bind_param("sss", $name, $email, $hash); // 2. подставляем значение вместо ?
 
-        if ($stmt->execute()) {
-            echo "<script>alert('Вы зарегистрированы'); window.location.href='registration.php';</script>";
-            exit;
+        // 3. выполняем
+        if ($stmt->execute()) { 
+            header('Location: join_profile.php');
+            die();
         } else {
-            echo "Ошибка: " . $stmt->error;
+            error_log($stmt->error);
+            array_push($errors, "Ошибка регистрации, попробуйте позже");
         }
 
         $stmt->close();
-    }
-
-    if (!empty($errors)) {
-        foreach ($errors as $error) {
-            echo "<div class='alert alert-danger'>" . htmlspecialchars($error) . "</div>";
-        }
     }
 } 
 
@@ -90,13 +86,18 @@ if (isset($_POST["submit"])) {
 </head>
 
 <body>
+    <?php if (!empty($errors)): ?>
+    <?php foreach ($errors as $error): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+    <?php endforeach; ?>
+    <?php endif; ?>
     <div class="container">
         <form action="" method="post">
             <div class="form-group">
-                <input type="text" class="form-control" name="name" placeholder="Введите ваше имя">
+                <input type="text" class="form-control" value="<?= htmlspecialchars($name ?? '')?>" name="name" placeholder="Введите ваше имя">
             </div>
             <div class="form-group">
-                <input type="email" class="form-control" name="email" placeholder="Введите ваш адрес почты">
+                <input type="email" class="form-control" value="<?= htmlspecialchars($email ?? '')?>" name="email" placeholder="Введите ваш адрес почты">
             </div>
             <div class="form-group">
                 <input type="password" class="form-control" name="password" placeholder="Введите ваш пароль">
@@ -106,10 +107,9 @@ if (isset($_POST["submit"])) {
                     placeholder="Введите ваш пароль снова">
             </div>
             <div class="form-btn">
-                <button type="submit" class="btn btn-primary" value="Register" name="submit">Зарегистрироваться</button>
+                <button type="submit" class="btn btn-primary" name="submit">Зарегистрироваться</button>
             </div>
         </form>
     </div>
 </body>
-
 </html>
